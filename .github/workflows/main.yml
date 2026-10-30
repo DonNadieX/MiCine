@@ -4,6 +4,10 @@ on:
   push:
   workflow_dispatch:
 
+# Permiso para publicar cada versión en "Releases" (de ahí la descarga la app para actualizarse)
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,8 +35,27 @@ jobs:
         working-directory: ${{ env.PROYECTO }}
         run: gradle assembleDebug --no-daemon
 
+      - name: Preparar versión
+        run: |
+          VC=$(grep -oP 'versionCode = \K\d+' "$PROYECTO/app/build.gradle.kts")
+          VN=$(grep -oP 'versionName = "\K[^"]+' "$PROYECTO/app/build.gradle.kts")
+          cp "$PROYECTO"/app/build/outputs/apk/debug/*.apk MiCine.apk
+          echo "VC=$VC" >> $GITHUB_ENV
+          echo "VN=$VN" >> $GITHUB_ENV
+          NOTES="$PROYECTO/NOVEDADES.txt"
+          if [ -f "$NOTES" ]; then cp "$NOTES" notas.txt; else echo "Mi Cine $VN" > notas.txt; fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: MiCine-apk
-          path: ${{ env.PROYECTO }}/app/build/outputs/apk/debug/*.apk
+          path: MiCine.apk
+
+      - name: Publicar versión
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VC }}
+          name: Mi Cine ${{ env.VN }}
+          body_path: notas.txt
+          files: MiCine.apk
+          make_latest: true
           
